@@ -15,8 +15,8 @@ type Board struct {
 	controller   *Client   // Only one client will control the information to the board, so we don't flood the memory and the cpu
 }
 
-func NewBoard(start, end Point) *Board {
-	return &Board{Start: start, End: end}
+func NewBoard(start Point) *Board {
+	return &Board{Start: start}
 }
 
 func (b *Board) GetCanvasIndex(at Point) int {

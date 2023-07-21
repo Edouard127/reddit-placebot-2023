@@ -16,10 +16,9 @@ func TestClient_Login(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	browser := NewBrowser(logger.With(zap.String("browser", "test")))
 
-	minX, minY := flag.Int("minX", -500, "Min X"), flag.Int("minY", -500, "Min Y")
-	maxX, maxY := flag.Int("maxX", 0, "Max X"), flag.Int("maxY", 0, "Max Y")
+	minX, minY := flag.Int("minX", 41, "Min X"), flag.Int("minY", -294, "Min Y")
 
-	board := NewBoard(Point{*minX, *minY}, Point{*maxX, *maxY})
+	board := NewBoard(Point{*minX, *minY})
 	worker := NewWorker(board)
 
 	clients := readClients(logger, browser)

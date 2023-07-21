@@ -22,8 +22,8 @@ type Point struct {
 	Y int `json:"y"`
 }
 
-func (p Point) toPlacePoint(canvas int) Point {
-	return Point{pointAbsolute(p.X, 500), pointAbsolute(p.Y, 500)} // idk
+func (p Point) toPlacePoint() Point {
+	return Point{pointAbsolute(p.X, 500), p.Y} // idk
 }
 
 func pointAbsolute(point, size int) int {

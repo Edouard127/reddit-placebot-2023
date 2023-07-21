@@ -8,7 +8,6 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"go.uber.org/zap"
 	"golang.org/x/net/websocket"
-	"io/ioutil"
 	"net/http"
 	"sync"
 	"time"
@@ -34,7 +33,7 @@ func (cl *Client) Login(board *Board, wg *sync.WaitGroup) error {
 
 	if cl.AccessToken != "" {
 		go cl.connect(board)
-		cl.Info("Login successful", zap.String("username", cl.Username))
+		cl.Info("Login successful")
 		return nil
 	}
 
@@ -68,7 +67,7 @@ func (cl *Client) Login(board *Board, wg *sync.WaitGroup) error {
 	cl.getAccessToken()
 	go cl.connect(board)
 
-	cl.Info("Login successful", zap.String("username", cl.Username))
+	cl.Info("Login successful")
 	return nil
 }
 
@@ -221,9 +220,9 @@ func (cl *Client) Place(board *Board) time.Time {
 			Input: PlaceInput{
 				ActionName: "r/replace:set_pixel",
 				PixelMessageData: PlaceData{
-					CanvasIndex: board.GetCanvasIndex(data.First),
+					CanvasIndex: board.GetCanvasIndex(Point{-499, -495}),
 					ColorIndex:  GetColorIndex(data.Second),
-					Coordinate:  data.First.toPlacePoint(board.GetCanvasIndex(data.First)),
+					Coordinate:  Point{-494, 495}.toPlacePoint(),
 				},
 			},
 		},
@@ -248,21 +247,19 @@ func (cl *Client) Place(board *Board) time.Time {
 
 	defer resp.Body.Close()
 
-	responseBytes, _ := ioutil.ReadAll(resp.Body)
+	var response Error
 
-	var response ActResponse
-
-	err = json.NewDecoder(bytes.NewBuffer(responseBytes)).Decode(&response)
+	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		cl.Error("Error decoding response", zap.Error(err))
 		return time.Now()
 	}
 
-	if len(response.Data.Act.Data) == 0 {
-		return time.Now().Add(time.Minute)
+	if len(response.Errors) == 0 {
+		return time.Now().Add(5 * time.Minute)
 	}
 
-	return time.Unix(0, response.Data.Act.Data[0].Data.NextAvailablePixelTimestamp.(int64))
+	return time.Unix(int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))/1000, int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64)))
 }
 
 func (cl *Client) GetCookie(fn func(*proto.NetworkCookie) bool) *proto.NetworkCookie {
