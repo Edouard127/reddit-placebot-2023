@@ -1,8 +1,8 @@
 ### Reddit place bot 2023
 
 - [x] 👍 API-less authentication
-- [x] ❌ Worker system
-- [x] ⌛ Place pixels
+- [x] ⌛ Worker system
+- [x] 👍 Place pixels
 
 ## How to use
 1. Put the image you would like to draw in the `images` folder in the following format: `image.bmp`
