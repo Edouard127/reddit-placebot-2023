@@ -105,6 +105,36 @@ type PlaceData struct {
 	Coordinate  Point `json:"coordinate"`
 }
 
+type ActIndexer[Indexer any] struct {
+	Act Indexer `json:"act"`
+}
+
+type ActDataAccessor struct {
+	Data []ActData `json:"data"`
+}
+
+type ActData struct {
+	Id   string       `json:"id"`
+	Data ActTimestamp `json:"data"`
+}
+
+type ActTimestamp struct {
+	NextAvailablePixelTimestamp any `json:"nextAvailablePixelTimestamp"`
+}
+
+type Error struct {
+	Errors []ErrorData `json:"errors"`
+}
+
+type ErrorData struct {
+	Message    string         `json:"message"`
+	Extensions ErrorExtension `json:"extensions"`
+}
+
+type ErrorExtension struct {
+	NextAvailablePixelTimestamp any `json:"nextAvailablePixelTs"`
+}
+
 type ConnectionInit Payload[Authorization]
 type Subscribe Payload[Var[VarInput[SubscribeConfig]]]
 type Replace Payload[Var[VarInput[SubscribeReplace]]]
@@ -113,3 +143,6 @@ type Place Var[PlacePixel]
 type ConnectionUnauthorized Payload[Message]
 type SubscribedData Payload[SubscribeResponse]
 type CanvasUpdate Payload[CanvasUpdateData]
+type ActResponse struct {
+	Data ActIndexer[ActDataAccessor] `json:"data"`
+}

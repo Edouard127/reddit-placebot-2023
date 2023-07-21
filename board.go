@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"image/png"
 	"math"
 	"net/http"
 )
 
 type Board struct {
-	Start, End    Point
-	RequiredData  *BMPImage // The image to draw on the canvas
-	CurrentData   *BMPImage // Only the canvas data between Start and End, so we don't flood the memory and the cpu
-	Width, Height int
+	Start, End   Point
+	RequiredData *BMPImage // The image to draw on the canvas
+	CurrentData  *BMPImage // Only the canvas data between Start and End, so we don't flood the memory and the cpu
+	controller   *Client   // Only one client will control the information to the board, so we don't flood the memory and the cpu
 }
 
 func NewBoard(start, end Point) *Board {
@@ -32,18 +33,58 @@ func (b *Board) GetCanvasIndex(at Point) int {
 	panic(fmt.Sprintf("Point %v is not in the canvas", at))
 }
 
+func (b *Board) GetDifferentData() map[Point]Color {
+	differentData := make(map[Point]Color, 0)
+
+	for point, color := range b.RequiredData.Colors {
+		if b.CurrentData.Colors[point] != color {
+			differentData[point] = color
+		}
+	}
+
+	return differentData
+}
+
+func (b *Board) SetController(controller *Client) {
+	if b.controller == nil {
+		b.controller = controller
+		b.controller.Logger.Info("Controller changed", zap.String("old", b.controller.Username), zap.String("new", controller.Username))
+	}
+}
+
+func (b *Board) checkForController(c *Client) bool {
+	return b.controller == c && b.controller != nil
+}
+
+func (b *Board) SetColors(c *Client, colors []SubscribeColor) {
+	if !b.checkForController(c) {
+		return
+	}
+
+	SetActiveColors(colors)
+}
+
 // SetRequiredData should be called after we're connected to the websocket and received the SubscribedData
-func (b *Board) SetRequiredData(data *BMPImage) {
+func (b *Board) SetRequiredData(c *Client, data *BMPImage) {
+	if !b.checkForController(c) {
+		return
+	}
+
+	b.End = Point{X: data.Width, Y: data.Height}
 	b.RequiredData = data
 }
 
-func (b *Board) SetCanvasSize(width, height int) {
-	b.Width = width
-	b.Height = height
+func (b *Board) SetCurrentData(c *Client, url string) {
+	if !b.checkForController(c) {
+		return
+	}
+
+	b.downloadImage(url)
 }
 
-func (b *Board) SetCurrentData(url string) {
-	b.downloadImage(url)
+func (b *Board) WaitForData() {
+	for b.RequiredData == nil || b.CurrentData == nil {
+	}
 }
 
 var Colors = map[int]Color{

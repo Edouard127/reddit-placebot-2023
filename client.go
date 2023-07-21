@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/websocket"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -19,15 +20,24 @@ type Client struct {
 	Password    string `json:"password"`
 	AccessToken string `json:"access_token"`
 
-	Browser  *Browser               `json:"-"`
-	Socket   *websocket.Conn        `json:"-"`
-	Page     *rod.Page              `json:"-"`
-	Board    *Board                 `json:"-"`
-	Cookies  []*proto.NetworkCookie `json:"cookies"`
+	Browser      *Browser               `json:"-"`
+	Socket       *websocket.Conn        `json:"-"`
+	Page         *rod.Page              `json:"-"`
+	Cookies      []*proto.NetworkCookie `json:"cookies"`
+	AssignedData *CircularQueue[Pair[Point, Color]]
+
 	packetid int
 }
 
-func (cl *Client) Login() {
+func (cl *Client) Login(board *Board, wg *sync.WaitGroup) error {
+	defer wg.Done()
+
+	if cl.AccessToken != "" {
+		go cl.connect(board)
+		cl.Info("Login successful", zap.String("username", cl.Username))
+		return nil
+	}
+
 	cl.Browser.Request(cl)
 	defer cl.Browser.Free()
 
@@ -44,7 +54,7 @@ func (cl *Client) Login() {
 		// Get current url
 		if cl.Page.MustInfo().URL != "https://old.reddit.com/" {
 			cl.Error("Login failed", zap.String("username", cl.Username))
-			return
+			return fmt.Errorf("login failed")
 		}
 
 		cl.Cookies = cl.Page.MustCookies()
@@ -53,17 +63,13 @@ func (cl *Client) Login() {
 		cl.Page.MustSetCookies(toParam(cl.Cookies)...)
 		cl.Page.MustReload()
 		cl.Page.MustWaitStable()
-
-		cl.Page.MustScreenshot("test.png")
 	}
 
-	if cl.AccessToken == "" {
-		cl.getAccessToken()
-	}
-
-	go cl.connect()
+	cl.getAccessToken()
+	go cl.connect(board)
 
 	cl.Info("Login successful", zap.String("username", cl.Username))
+	return nil
 }
 
 func (cl *Client) getAccessToken() {
@@ -81,7 +87,7 @@ func (cl *Client) getAccessToken() {
 	cl.AccessToken = connInit.Payload.Authorization
 }
 
-func (cl *Client) connect() {
+func (cl *Client) connect(board *Board) {
 	var err error
 
 	login, _ := json.Marshal(ConnectionInit{
@@ -139,7 +145,7 @@ func (cl *Client) connect() {
 		var message string
 		err = websocket.Message.Receive(cl.Socket, &message)
 		if err != nil {
-			fmt.Println("Error receiving message from socket")
+			fmt.Println("Error receiving message from socket", err)
 			return
 		}
 
@@ -159,7 +165,7 @@ func (cl *Client) connect() {
 		var message string
 		err = websocket.Message.Receive(cl.Socket, &message)
 		if err != nil {
-			fmt.Println("Error receiving message from socket")
+			fmt.Println("Error receiving message from socket", err)
 			return
 		}
 
@@ -171,9 +177,9 @@ func (cl *Client) connect() {
 		}
 	}
 
-	SetActiveColors(data.Payload.Data.Subscribe.Data.ColorPalette.Colors)
-	cl.Board.SetRequiredData(ImageColorConvert(LoadBMP()))
-	cl.Board.SetCanvasSize(data.Payload.Data.Subscribe.Data.CanvasWidth, data.Payload.Data.Subscribe.Data.CanvasHeight)
+	board.SetController(cl) // Do not remove
+	board.SetColors(cl, data.Payload.Data.Subscribe.Data.ColorPalette.Colors)
+	board.SetRequiredData(cl, ImageColorConvert(LoadBMP(board.Start.X, board.Start.Y)))
 
 	cl.Socket.Write(getCanvas("1"))
 	cl.Socket.Write(getCanvas("2"))
@@ -186,19 +192,28 @@ func (cl *Client) connect() {
 		var message string
 		err = websocket.Message.Receive(cl.Socket, &message)
 		if err != nil {
-			fmt.Println("Error receiving message from socket")
+			fmt.Println("Error receiving message from socket", err)
 			return
 		}
 
 		json.Unmarshal([]byte(message), &canvasData)
 
-		cl.Board.SetCurrentData(canvasData.Payload.Data.Subscribe.Data.Name)
+		board.SetCurrentData(cl, canvasData.Payload.Data.Subscribe.Data.Name)
+	}
+}
+
+func (cl *Client) Assign(data map[Point]Color) {
+	for point, color := range data {
+		cl.AssignedData.Enqueue(Pair[Point, Color]{point, color})
 	}
 }
 
 // Place places a pixel at the given point, does not require a browser allocation
 // Fix: It doesn't return any errors but doesn't place a pixel either
-func (cl *Client) Place(at Point, color Color) time.Time {
+func (cl *Client) Place(board *Board) time.Time {
+	data := cl.AssignedData.Dequeue()
+	fmt.Println("Placing pixel", data.First, data.Second)
+
 	place, _ := json.Marshal(Place{
 		OperationName: "setPixel",
 		Query:         "mutation setPixel($input: ActInput!) {\n  act(input: $input) {\n    data {\n      ... on BasicMessage {\n        id\n        data {\n          ... on GetUserCooldownResponseMessageData {\n            nextAvailablePixelTimestamp\n            __typename\n          }\n          ... on SetPixelResponseMessageData {\n            timestamp\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n",
@@ -206,9 +221,9 @@ func (cl *Client) Place(at Point, color Color) time.Time {
 			Input: PlaceInput{
 				ActionName: "r/replace:set_pixel",
 				PixelMessageData: PlaceData{
-					CanvasIndex: cl.Board.GetCanvasIndex(at),
-					ColorIndex:  GetColorIndex(color),
-					Coordinate:  at.toPlacePoint(cl.Board.GetCanvasIndex(at)),
+					CanvasIndex: board.GetCanvasIndex(data.First),
+					ColorIndex:  GetColorIndex(data.Second),
+					Coordinate:  data.First.toPlacePoint(board.GetCanvasIndex(data.First)),
 				},
 			},
 		},
@@ -233,20 +248,21 @@ func (cl *Client) Place(at Point, color Color) time.Time {
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	responseBytes, _ := ioutil.ReadAll(resp.Body)
+
+	var response ActResponse
+
+	err = json.NewDecoder(bytes.NewBuffer(responseBytes)).Decode(&response)
 	if err != nil {
-		cl.Error("Error reading response", zap.Error(err))
+		cl.Error("Error decoding response", zap.Error(err))
 		return time.Now()
 	}
 
-	fmt.Println(string(body))
+	if len(response.Data.Act.Data) == 0 {
+		return time.Now().Add(time.Minute)
+	}
 
-	return time.Now().Add(time.Minute * 5)
-}
-
-func (cl *Client) Save() []byte {
-	data, _ := json.Marshal(cl)
-	return data
+	return time.Unix(0, response.Data.Act.Data[0].Data.NextAvailablePixelTimestamp.(int64))
 }
 
 func (cl *Client) GetCookie(fn func(*proto.NetworkCookie) bool) *proto.NetworkCookie {

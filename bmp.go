@@ -33,7 +33,7 @@ func pointAbsolute(point, size int) int {
 	return point
 }
 
-func LoadBMP() *BMPImage {
+func LoadBMP(offsetX, offsetY int) *BMPImage {
 	f, err := os.Open("images/image.bmp")
 	if err != nil {
 		panic(err)
@@ -53,7 +53,7 @@ func LoadBMP() *BMPImage {
 	for x := 0; x < image.Bounds().Dx(); x++ {
 		for y := 0; y < image.Bounds().Dy(); y++ {
 			r, g, b, _ := image.At(x, y).RGBA()
-			bmpImage.Colors[Point{x, y}] = Color{
+			bmpImage.Colors[Point{x + offsetX, y + offsetY}] = Color{
 				R: uint8(r),
 				G: uint8(g),
 				B: uint8(b),

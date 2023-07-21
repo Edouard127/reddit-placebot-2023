@@ -23,8 +23,10 @@ func (q *CircularQueue[T]) Enqueue(element ...T) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
+	q.size += len(element)
+
 	for _, e := range element {
-		q.elements[q.tail] = e
+		q.elements = append(q.elements, e)
 		q.tail = (q.tail + 1) % q.size
 	}
 }
@@ -49,4 +51,9 @@ func (q *CircularQueue[T]) Peek() T {
 
 func (q *CircularQueue[T]) End() bool {
 	return q.head == q.tail
+}
+
+type Pair[T any, U any] struct {
+	First  T
+	Second U
 }

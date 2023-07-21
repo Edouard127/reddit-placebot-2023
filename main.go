@@ -6,12 +6,13 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/websocket"
 	"os"
+	"sync"
 )
 
 func main() {
 }
 
-func readClients(logger *zap.Logger, board *Board, browser *Browser) (clients []*Client) {
+func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 	file, err := os.Open("data/users.json")
 	if err != nil {
 		panic(err)
@@ -27,10 +28,10 @@ func readClients(logger *zap.Logger, board *Board, browser *Browser) (clients []
 
 	for _, client := range clients {
 		client.Logger = logger.With(zap.String("username", client.Username))
-		client.Board = board
 		client.Browser = browser
 		// TODO: Proxy support
 		client.Socket, _ = websocket.Dial("wss://gql-realtime-2.reddit.com/query", "", "https://hot-potato.reddit.com")
+		client.AssignedData = NewCircularQueue[Pair[Point, Color]](0) // dynamic
 	}
 
 	return
@@ -49,4 +50,20 @@ func writeClients(clients ...*Client) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+var s sync.Mutex
+
+func removeClient(clients []*Client, client *Client) []*Client {
+	s.Lock()
+	defer s.Unlock()
+
+	for i, c := range clients {
+		if c == client {
+			clients[i] = clients[len(clients)-1]
+			return clients[:len(clients)-1]
+		}
+	}
+
+	return clients
 }
