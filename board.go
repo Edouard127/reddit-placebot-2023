@@ -111,7 +111,7 @@ var Colors = map[int]Color{
 	21: hexToRGB("#DE107F"), // Magenta
 	22: hexToRGB("#FF3881"), // Pink
 	23: hexToRGB("#FF99AA"), // Light Pink
-	//24: hexToRGB("#6D482F"), // Dark Brown
+	24: hexToRGB("#6D482F"), // Dark Brown
 	25: hexToRGB("#9C6926"), // Brown
 	26: hexToRGB("#FFB470"), // Beige
 	27: hexToRGB("#000000"), // Black
