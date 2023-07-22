@@ -304,7 +304,7 @@ func (cl *Client) Place(board *Board) time.Time {
 
 	if len(response.Errors) == 0 {
 		if cl.GetPlaceHistory(data.First, board.GetCanvasIndex(data.First)).Data.Act.Data[0].Data.UserInfo.Username != cl.Username {
-			cl.Info("Account has been shadow banned from r/place")
+			cl.Info("There was an error placing pixel", zap.String("message", "Pixel was not placed, or was placed somewhere else"))
 		}
 		return time.Now().Add(5 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
 	} else {
