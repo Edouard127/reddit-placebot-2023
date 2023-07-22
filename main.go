@@ -64,7 +64,11 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 		fmt.Println("Error read users.json. Is empty?")
 	}
 
-	config, _ := websocket.NewConfig("wss://gql-realtime-2.reddit.com/query", "https://hot-potato.reddit.com")
+	config, err := websocket.NewConfig("wss://gql-realtime-2.reddit.com/query", "https://hot-potato.reddit.com")
+	if err != nil {
+		panic(err)
+	}
+	
 	config.Header.Add("Accept-Encoding", "gzip, deflate, br")
 	config.Header.Add("Accept-Language", "en-GB,en-US;q=0.9,en;q=0.8")
 	config.Header.Add("Cache-Control", "no-cache")
@@ -77,6 +81,9 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 	config.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 OPR/100.0.0.0 (Edition std-2)")
 
 	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+	if err != nil {
+		panic("I could not connect to the local tor node, is it running?")
+	}
 
 	config.Dialer = &net.Dialer{
 		Resolver: &net.Resolver{
