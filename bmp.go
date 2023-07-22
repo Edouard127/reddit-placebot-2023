@@ -26,7 +26,7 @@ func (p Point) toPlacePoint(canvas int) Point {
 	// canvas 0 -> x+1500 y+1000
 	// canvas 1 -> x+500 y+1000
 	// canvas 2 -> x+1500 y+0
-	// canvas 3 -> x+500 y+0
+	// canvas 3 -> x+1500 y+0
 	// canvas 4 -> x+500 y+0
 	// canvas 5 -> x-500 y+0
 	var x, y int
@@ -40,7 +40,10 @@ func (p Point) toPlacePoint(canvas int) Point {
 	case 2:
 		x = p.X + 1500
 		y = p.Y
-	case 3, 4:
+	case 3:
+		x = p.X + 1500
+		y = p.Y
+	case 4:
 		x = p.X + 500
 		y = p.Y
 	case 5:
