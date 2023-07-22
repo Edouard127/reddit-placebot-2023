@@ -1,7 +1,6 @@
 package main
 
 import (
-	"go.uber.org/zap"
 	"sync"
 	"time"
 )
@@ -43,11 +42,11 @@ func (k *Worker) Run() {
 
 					if t, ok := k.waitList[client]; ok {
 						if !t.After(time.Now()) {
-							client.Logger.Info("Placing client after wait", zap.String("client", client.Username))
+							client.Logger.Info("Placing client after wait")
 							k.waitList[client] = client.Place(k.board)
 						}
 					} else {
-						client.Logger.Info("Placing client", zap.String("client", client.Username))
+						client.Logger.Info("Placing client")
 						k.waitList[client] = client.Place(k.board)
 					}
 				}

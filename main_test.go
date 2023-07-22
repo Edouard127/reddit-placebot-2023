@@ -16,12 +16,13 @@ func TestClient_Login(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	browser := NewBrowser(logger.With(zap.String("browser", "test")))
 
-	minX, minY := flag.Int("minX", 41, "Min X"), flag.Int("minY", -294, "Min Y")
+	minX, minY := flag.Int("minX", -358, "Min X"), flag.Int("minY", 300, "Min Y")
 
+	proxies := ValidateProxies(loadProxies())
 	board := NewBoard(Point{*minX, *minY})
 	worker := NewWorker(board)
 
-	clients := readClients(logger, browser)
+	clients := readClients(logger, browser, NewCircularQueue[string](len(proxies)).Enqueue(proxies...))
 
 	var login sync.WaitGroup
 

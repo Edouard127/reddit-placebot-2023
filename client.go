@@ -8,28 +8,35 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"go.uber.org/zap"
 	"golang.org/x/net/websocket"
+	"io/ioutil"
+	"math/rand"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"sync"
 	"time"
 )
 
 type Client struct {
-	*zap.Logger
+	*zap.Logger `json:"-"`
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 	AccessToken string `json:"access_token"`
 
-	Browser      *Browser               `json:"-"`
-	Socket       *websocket.Conn        `json:"-"`
-	Page         *rod.Page              `json:"-"`
-	Cookies      []*proto.NetworkCookie `json:"cookies"`
-	AssignedData *CircularQueue[Pair[Point, Color]]
+	HTTP          *http.Client                       `json:"-"`
+	Browser       *Browser                           `json:"-"`
+	Socket        *websocket.Conn                    `json:"-"`
+	Page          *rod.Page                          `json:"-"`
+	Cookies       []*proto.NetworkCookie             `json:"cookies"`
+	AssignedData  *CircularQueue[Pair[Point, Color]] `json:"-"`
+	ProxyRotation *CircularQueue[string]             `json:"-"`
 
 	packetid int
 }
 
 func (cl *Client) Login(board *Board, wg *sync.WaitGroup) error {
 	defer wg.Done()
+	defer cl.Setup()
 
 	if cl.AccessToken != "" {
 		go cl.connect(board)
@@ -101,8 +108,8 @@ func (cl *Client) connect(board *Board) {
 	subscribe, _ := json.Marshal(Subscribe{
 		Id:   fmt.Sprintf("%d", cl.packetid),
 		Type: "start",
-		Payload: Var[VarInput[SubscribeConfig]]{
-			Variables: VarInput[SubscribeConfig]{
+		Payload: Var[VarInput[Input[SubscribeConfig]]]{
+			Variables: VarInput[Input[SubscribeConfig]]{
 				Input: Input[SubscribeConfig]{
 					Channel: SubscribeConfig{
 						TeamOwner: "GARLICBREAD",
@@ -120,8 +127,8 @@ func (cl *Client) connect(board *Board) {
 		data, _ := json.Marshal(Replace{
 			Id:   fmt.Sprintf("%d", cl.packetid),
 			Type: "start",
-			Payload: Var[VarInput[SubscribeReplace]]{
-				Variables: VarInput[SubscribeReplace]{
+			Payload: Var[VarInput[Input[SubscribeReplace]]]{
+				Variables: VarInput[Input[SubscribeReplace]]{
 					Input: Input[SubscribeReplace]{
 						Channel: SubscribeReplace{
 							TeamOwner: "GARLICBREAD",
@@ -201,6 +208,25 @@ func (cl *Client) connect(board *Board) {
 	}
 }
 
+func (cl *Client) Setup() {
+	jar, _ := cookiejar.New(nil)
+	cl.HTTP = &http.Client{Jar: jar}
+
+	cookies := make([]*http.Cookie, len(cl.Cookies))
+	for i, cookie := range cl.Cookies {
+		cookies[i] = &http.Cookie{
+			Name:  cookie.Name,
+			Value: cookie.Value,
+		}
+	}
+
+	cl.HTTP.Jar.SetCookies(&url.URL{
+		Scheme: "https",
+		Host:   ".reddit.com",
+		Path:   "/",
+	}, cookies)
+}
+
 func (cl *Client) Assign(data map[Point]Color) {
 	for point, color := range data {
 		cl.AssignedData.Enqueue(Pair[Point, Color]{point, color})
@@ -211,18 +237,18 @@ func (cl *Client) Assign(data map[Point]Color) {
 // Fix: It doesn't return any errors but doesn't place a pixel either
 func (cl *Client) Place(board *Board) time.Time {
 	data := cl.AssignedData.Dequeue()
-	fmt.Println("Placing pixel", data.First, data.Second)
+	fmt.Println("Placing pixel", data.First, data.Second, board.GetCanvasIndex(data.First))
 
 	place, _ := json.Marshal(Place{
 		OperationName: "setPixel",
 		Query:         "mutation setPixel($input: ActInput!) {\n  act(input: $input) {\n    data {\n      ... on BasicMessage {\n        id\n        data {\n          ... on GetUserCooldownResponseMessageData {\n            nextAvailablePixelTimestamp\n            __typename\n          }\n          ... on SetPixelResponseMessageData {\n            timestamp\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n",
 		Variables: PlacePixel{
-			Input: PlaceInput{
+			Input: PlaceInput[PlaceData]{
 				ActionName: "r/replace:set_pixel",
 				PixelMessageData: PlaceData{
-					CanvasIndex: board.GetCanvasIndex(Point{-499, -495}),
+					CanvasIndex: board.GetCanvasIndex(data.First),
 					ColorIndex:  GetColorIndex(data.Second),
-					Coordinate:  Point{-494, 495}.toPlacePoint(),
+					Coordinate:  data.First.toPlacePoint(),
 				},
 			},
 		},
@@ -239,7 +265,7 @@ func (cl *Client) Place(board *Board) time.Time {
 	req.Header.Set("Origin", "https://hot-potato.reddit.com")
 	req.Header.Set("Referer", "https://hot-potato.reddit.com/")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := cl.HTTP.Do(req)
 	if err != nil {
 		cl.Error("Error sending request", zap.Error(err))
 		return time.Now()
@@ -256,20 +282,51 @@ func (cl *Client) Place(board *Board) time.Time {
 	}
 
 	if len(response.Errors) == 0 {
-		return time.Now().Add(5 * time.Minute)
+		fmt.Println(cl.GetPlaceHistory(data.First, board.GetCanvasIndex(data.First)))
+		return time.Now().Add(5 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
 	}
 
-	return time.Unix(int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))/1000, int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64)))
+	return time.Unix(int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))/1000, int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))).Add(time.Duration(rand.Intn(60)) * time.Second)
 }
 
-func (cl *Client) GetCookie(fn func(*proto.NetworkCookie) bool) *proto.NetworkCookie {
-	for _, cookie := range cl.Cookies {
-		if fn(cookie) {
-			return cookie
-		}
+func (cl *Client) GetPlaceHistory(at Point, canvas int) string {
+	history, _ := json.Marshal(History{
+		OperationName: "pixelHistory",
+		Query:         "mutation pixelHistory($input: ActInput!) {\n  act(input: $input) {\n    data {\n      ... on BasicMessage {\n        id\n        data {\n          ... on GetTileHistoryResponseMessageData {\n            lastModifiedTimestamp\n            userInfo {\n              userID\n              username\n              __typename\n            }\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n",
+		Variables: VarInput[PlaceInput[PlaceData]]{
+			Input: PlaceInput[PlaceData]{
+				ActionName: "r/replace:get_tile_history",
+				PixelMessageData: PlaceData{
+					CanvasIndex: canvas,
+					Coordinate:  at.toPlacePoint(),
+				},
+			},
+		},
+	})
+
+	req, err := http.NewRequest("POST", "https://gql-realtime-2.reddit.com/query", bytes.NewReader(history))
+	if err != nil {
+		cl.Error("Error creating request", zap.Error(err))
 	}
 
-	return nil
+	req.Header.Set("Authorization", cl.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://hot-potato.reddit.com")
+	req.Header.Set("Referer", "https://hot-potato.reddit.com/")
+
+	resp, err := cl.HTTP.Do(req)
+	if err != nil {
+		cl.Error("Error sending request", zap.Error(err))
+	}
+
+	defer resp.Body.Close()
+
+	bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		cl.Error("Error reading response", zap.Error(err))
+	}
+
+	return string(bytes)
 }
 
 func toParam(cookies []*proto.NetworkCookie) []*proto.NetworkCookieParam {
