@@ -131,7 +131,6 @@ func SetActiveColors(colors []SubscribeColor) {
 
 func GetColorIndex(color Color) int {
 	for index, c := range ActiveColors {
-		fmt.Println(index, c, color)
 		if c == color {
 			return index
 		}
