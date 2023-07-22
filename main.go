@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"go.uber.org/zap"
 	"golang.org/x/net/websocket"
@@ -13,6 +14,41 @@ import (
 )
 
 func main() {
+	logger, _ := zap.NewDevelopment()
+	browser := NewBrowser(logger.With(zap.String("browser", "test")))
+
+	minX, minY := flag.Int("minX", 0, "Min X"), flag.Int("minY", 0, "Min Y")
+
+	proxies := ValidateProxies(loadProxies())
+	board := NewBoard(Point{*minX, *minY})
+	worker := NewWorker(board)
+
+	clients := readClients(logger, browser, NewCircularQueue[string](len(proxies)).Enqueue(proxies...))
+
+	var login sync.WaitGroup
+
+	for _, client := range clients {
+		login.Add(1)
+		go func(c *Client) {
+			err := c.Login(board, &login)
+			if err != nil {
+				clients = removeClient(clients, c)
+			}
+		}(client)
+	}
+
+	fmt.Println("Waiting for login to finish...")
+	login.Wait()
+	fmt.Println("Login finished!")
+
+	writeClients(clients...)
+
+	fmt.Println("Waiting for board data")
+	board.WaitForData()
+	fmt.Println("Board data received!")
+
+	worker.ClientJoin(clients...)
+	worker.Run()
 }
 
 func readClients(logger *zap.Logger, browser *Browser, proxyReader *CircularQueue[string]) (clients []*Client) {

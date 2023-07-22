@@ -47,7 +47,7 @@ func TestClient_Login(t *testing.T) {
 	fmt.Println("Board data received!")
 
 	worker.ClientJoin(clients...)
-	go worker.Run()
+	worker.Run()
 
 	for {
 	}
