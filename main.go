@@ -94,6 +94,10 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 		},
 	}
 
+	if len(clients) == 0 {
+		panic("No accounts found in data/users.json")
+	}
+
 	for _, client := range clients {
 		client.Logger = logger.With(zap.String("username", client.Username))
 		client.Browser = browser
