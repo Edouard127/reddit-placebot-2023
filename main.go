@@ -68,7 +68,7 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	config.Header.Add("Accept-Encoding", "gzip, deflate, br")
 	config.Header.Add("Accept-Language", "en-GB,en-US;q=0.9,en;q=0.8")
 	config.Header.Add("Cache-Control", "no-cache")
@@ -96,7 +96,11 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 	for _, client := range clients {
 		client.Logger = logger.With(zap.String("username", client.Username))
 		client.Browser = browser
-		client.Socket, _ = websocket.DialConfig(config)
+		client.Socket, err = websocket.DialConfig(config)
+		if err != nil {
+			panic(err)
+		}
+		
 		client.AssignedData = NewCircularQueue[Pair[Point, Color]](0) // dynamic
 	}
 
