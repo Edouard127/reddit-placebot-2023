@@ -131,6 +131,7 @@ func SetActiveColors(colors []SubscribeColor) {
 
 func GetColorIndex(color Color) int {
 	for index, c := range ActiveColors {
+		fmt.Println(index, c, color)
 		if c == color {
 			return index
 		}
@@ -148,7 +149,7 @@ func ImageColorConvert(image *BMPImage) *BMPImage {
 func closestColor(color Color) *Color {
 	var closestColor *Color
 	var closestDistance = math.MaxFloat64
-	for _, c := range Colors {
+	for _, c := range ActiveColors {
 		distance := euclideanDistance(color, c)
 		if closestDistance == 0 || distance < closestDistance {
 			closestDistance = distance
