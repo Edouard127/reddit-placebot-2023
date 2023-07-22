@@ -121,7 +121,7 @@ var Colors = map[int]Color{
 	31: hexToRGB("#FFFFFF"), // White
 }
 
-var ActiveColors = map[int]Color{}
+var ActiveColors = make(map[int]Color, 0)
 
 func SetActiveColors(colors []SubscribeColor) {
 	for _, color := range colors {

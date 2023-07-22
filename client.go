@@ -254,7 +254,7 @@ func (cl *Client) Assign(data map[Point]Color) {
 // Fix: It doesn't return any errors but doesn't place a pixel either
 func (cl *Client) Place(board *Board) time.Time {
 	data := cl.AssignedData.Dequeue()
-	fmt.Println("Placing pixel", data.First, data.Second, board.GetCanvasIndex(data.First), data.First.toPlacePoint())
+	fmt.Println("Placing pixel", data.First, data.Second, board.GetCanvasIndex(data.First), data.First.toPlacePoint(board.GetCanvasIndex(data.First)))
 
 	place, _ := json.Marshal(Place{
 		OperationName: "setPixel",
@@ -265,7 +265,7 @@ func (cl *Client) Place(board *Board) time.Time {
 				PixelMessageData: PlaceData{
 					CanvasIndex: board.GetCanvasIndex(data.First),
 					ColorIndex:  GetColorIndex(data.Second),
-					Coordinate:  data.First.toPlacePoint(),
+					Coordinate:  data.First.toPlacePoint(board.GetCanvasIndex(data.First)),
 				},
 			},
 		},
@@ -335,7 +335,7 @@ func (cl *Client) GetPlaceHistory(at Point, canvas int) HistoryResponse {
 				ActionName: "r/replace:get_tile_history",
 				PixelMessageData: PlaceData{
 					CanvasIndex: canvas,
-					Coordinate:  at.toPlacePoint(),
+					Coordinate:  at.toPlacePoint(canvas),
 				},
 			},
 		},
