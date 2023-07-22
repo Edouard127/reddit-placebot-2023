@@ -130,7 +130,7 @@ func SetActiveColors(colors []SubscribeColor) {
 }
 
 func GetColorIndex(color Color) int {
-	for index, c := range Colors {
+	for index, c := range ActiveColors {
 		if c == color {
 			return index
 		}
