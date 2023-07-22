@@ -100,7 +100,7 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 		if err != nil {
 			panic(err)
 		}
-		
+
 		client.AssignedData = NewCircularQueue[Pair[Point, Color]](0) // dynamic
 	}
 

@@ -118,6 +118,29 @@ type ErrorExtension struct {
 	NextAvailablePixelTimestamp any `json:"nextAvailablePixelTs"`
 }
 
+type Act[D any] struct {
+	Data D `json:"data"`
+}
+
+type HistoryData struct {
+	Act Act[[]HistoryResponseData] `json:"act"`
+}
+
+type HistoryResponseData struct {
+	Id   string `json:"id"`
+	Data LastModified
+}
+
+type LastModified struct {
+	LastModified float64  `json:"lastModifiedTimestamp"`
+	UserInfo     UserInfo `json:"userInfo"`
+}
+
+type UserInfo struct {
+	UserID   string `json:"userId"`
+	Username string `json:"username"`
+}
+
 type ConnectionInit Payload[Authorization]
 type Subscribe Payload[Var[VarInput[Input[SubscribeConfig]]]]
 type Replace Payload[Var[VarInput[Input[SubscribeReplace]]]]
@@ -127,3 +150,4 @@ type History Var[VarInput[PlaceInput[PlaceData]]]
 type ConnectionUnauthorized Payload[Message]
 type SubscribedData Payload[SubscribeResponse]
 type CanvasUpdate Payload[CanvasUpdateData]
+type HistoryResponse Act[HistoryData]

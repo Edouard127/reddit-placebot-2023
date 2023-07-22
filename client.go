@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/proxy"
 	"golang.org/x/net/websocket"
-	"io/ioutil"
+	"math"
 	"math/rand"
 	"net"
 	"net/http"
@@ -303,21 +303,30 @@ func (cl *Client) Place(board *Board) time.Time {
 	}
 
 	if len(response.Errors) == 0 {
-		fmt.Println(cl.GetPlaceHistory(data.First, board.GetCanvasIndex(data.First)))
+		if cl.GetPlaceHistory(data.First, board.GetCanvasIndex(data.First)).Data.Act.Data[0].Data.UserInfo.Username != cl.Username {
+			cl.Info("Account has been shadow banned from r/place")
+		}
 		return time.Now().Add(5 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
 	} else {
 		cl.Info("Error placing pixel", zap.String("message", response.Errors[0].Message))
+
+		if response.Errors[0].Message == "Ratelimited" {
+			if int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))/1000 == math.MaxInt32 {
+				cl.Info("Account has been banned from r/place")
+			}
+
+			return time.Unix(int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))/1000, int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))).Add(time.Duration(rand.Intn(60)) * time.Second)
+		}
+
+		if response.Errors[0].Message == "unable to verify user" {
+			cl.Info("Account does not have access to r/place due to not being email verified")
+		}
+
+		return time.Now().Add(math.MaxInt32 * time.Second)
 	}
-
-	if response.Errors[0].Extensions.NextAvailablePixelTimestamp == nil {
-		cl.Info("Error placing pixel", zap.String("message", response.Errors[0].Message))
-		return time.Now().Add(5 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
-	} // TODO: Fix this
-
-	return time.Unix(int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))/1000, int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))).Add(time.Duration(rand.Intn(60)) * time.Second)
 }
 
-func (cl *Client) GetPlaceHistory(at Point, canvas int) string {
+func (cl *Client) GetPlaceHistory(at Point, canvas int) HistoryResponse {
 	history, _ := json.Marshal(History{
 		OperationName: "pixelHistory",
 		Query:         "mutation pixelHistory($input: ActInput!) {\n  act(input: $input) {\n    data {\n      ... on BasicMessage {\n        id\n        data {\n          ... on GetTileHistoryResponseMessageData {\n            lastModifiedTimestamp\n            userInfo {\n              userID\n              username\n              __typename\n            }\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n",
@@ -349,12 +358,14 @@ func (cl *Client) GetPlaceHistory(at Point, canvas int) string {
 
 	defer resp.Body.Close()
 
-	bytes, err := ioutil.ReadAll(resp.Body)
+	var response HistoryResponse
+
+	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
-		cl.Error("Error reading response", zap.Error(err))
+		cl.Error("Error decoding response", zap.Error(err))
 	}
 
-	return string(bytes)
+	return response
 }
 
 func toParam(cookies []*proto.NetworkCookie) []*proto.NetworkCookieParam {
