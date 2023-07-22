@@ -2,17 +2,22 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"go.uber.org/zap"
+	"golang.org/x/net/proxy"
 	"golang.org/x/net/websocket"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 )
@@ -176,7 +181,6 @@ func (cl *Client) connect(board *Board) {
 		}
 
 		json.Unmarshal([]byte(message), &data)
-		fmt.Println(message)
 
 		if data.Type == "data" {
 			break
@@ -209,8 +213,21 @@ func (cl *Client) connect(board *Board) {
 }
 
 func (cl *Client) Setup() {
+	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+	if err != nil {
+		panic(err)
+	}
+
 	jar, _ := cookiejar.New(nil)
-	cl.HTTP = &http.Client{Jar: jar}
+
+	cl.HTTP = &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialer.Dial(network, addr)
+			},
+		},
+		Jar: jar,
+	}
 
 	cookies := make([]*http.Cookie, len(cl.Cookies))
 	for i, cookie := range cl.Cookies {
@@ -237,7 +254,7 @@ func (cl *Client) Assign(data map[Point]Color) {
 // Fix: It doesn't return any errors but doesn't place a pixel either
 func (cl *Client) Place(board *Board) time.Time {
 	data := cl.AssignedData.Dequeue()
-	fmt.Println("Placing pixel", data.First, data.Second, board.GetCanvasIndex(data.First))
+	fmt.Println("Placing pixel", data.First, data.Second, board.GetCanvasIndex(data.First), data.First.toPlacePoint())
 
 	place, _ := json.Marshal(Place{
 		OperationName: "setPixel",
@@ -257,6 +274,10 @@ func (cl *Client) Place(board *Board) time.Time {
 	req, err := http.NewRequest("POST", "https://gql-realtime-2.reddit.com/query", bytes.NewReader(place))
 	if err != nil {
 		cl.Error("Error creating request", zap.Error(err))
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			cl.Setup()
+			return cl.Place(board)
+		}
 		return time.Now()
 	}
 
@@ -284,7 +305,14 @@ func (cl *Client) Place(board *Board) time.Time {
 	if len(response.Errors) == 0 {
 		fmt.Println(cl.GetPlaceHistory(data.First, board.GetCanvasIndex(data.First)))
 		return time.Now().Add(5 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
+	} else {
+		cl.Info("Error placing pixel", zap.String("message", response.Errors[0].Message))
 	}
+
+	if response.Errors[0].Extensions.NextAvailablePixelTimestamp == nil {
+		cl.Info("Error placing pixel", zap.String("message", response.Errors[0].Message))
+		return time.Now().Add(5 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
+	} // TODO: Fix this
 
 	return time.Unix(int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))/1000, int64(response.Errors[0].Extensions.NextAvailablePixelTimestamp.(float64))).Add(time.Duration(rand.Intn(60)) * time.Second)
 }

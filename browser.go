@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/go-rod/rod"
 	"go.uber.org/zap"
 	"sync"
@@ -35,9 +34,7 @@ func (br *Browser) Request(call *Client) {
 	br.mu.Lock()
 	defer br.mu.Unlock()
 
-	fmt.Println("Requesting browser for", call.Username)
 	br.CanAccess()
-	fmt.Println("Browser is free for", call.Username)
 	br.caller = call
 	br.free = false
 }
@@ -45,12 +42,12 @@ func (br *Browser) Request(call *Client) {
 // Free the browser for other clients to use.
 // MUST BE CALLED AFTER EVERY CLIENT ACTION
 func (br *Browser) Free() {
-	fmt.Println("Freeing browser for", br.caller.Username)
 	br.free = false
 	br.new()
 }
 
 func (br *Browser) new() {
+	br.Browser.Close()
 	br.Browser = rod.New().MustConnect()
 	br.free = true
 }

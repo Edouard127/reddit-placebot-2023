@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/sergeymakinen/go-bmp"
+	"math"
 	"os"
 )
 
@@ -23,7 +24,7 @@ type Point struct {
 }
 
 func (p Point) toPlacePoint() Point {
-	return Point{pointAbsolute(p.X, 500), p.Y} // idk
+	return Point{pointAbsolute(p.X, 500), 1000 - int(math.Abs(float64(p.Y)))}
 }
 
 func pointAbsolute(point, size int) int {

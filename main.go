@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bufio"
-	"context"
+	context "context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"go.uber.org/zap"
+	"golang.org/x/net/proxy"
 	"golang.org/x/net/websocket"
 	"net"
 	"os"
@@ -19,11 +19,10 @@ func main() {
 
 	minX, minY := flag.Int("minX", 0, "Min X"), flag.Int("minY", 0, "Min Y")
 
-	proxies := ValidateProxies(loadProxies())
 	board := NewBoard(Point{*minX, *minY})
 	worker := NewWorker(board)
 
-	clients := readClients(logger, browser, NewCircularQueue[string](len(proxies)).Enqueue(proxies...))
+	clients := readClients(logger, browser)
 
 	var login sync.WaitGroup
 
@@ -51,7 +50,7 @@ func main() {
 	worker.Run()
 }
 
-func readClients(logger *zap.Logger, browser *Browser, proxyReader *CircularQueue[string]) (clients []*Client) {
+func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 	file, err := os.Open("data/users.json")
 	if err != nil {
 		panic(err)
@@ -77,10 +76,12 @@ func readClients(logger *zap.Logger, browser *Browser, proxyReader *CircularQueu
 	config.Header.Add("Upgrade", "websocket")
 	config.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 OPR/100.0.0.0 (Edition std-2)")
 
+	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+
 	config.Dialer = &net.Dialer{
 		Resolver: &net.Resolver{
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				return net.Dial("tcp", proxyReader.Dequeue())
+				return dialer.Dial(network, address)
 			},
 		},
 	}
@@ -90,7 +91,6 @@ func readClients(logger *zap.Logger, browser *Browser, proxyReader *CircularQueu
 		client.Browser = browser
 		client.Socket, _ = websocket.DialConfig(config)
 		client.AssignedData = NewCircularQueue[Pair[Point, Color]](0) // dynamic
-		client.ProxyRotation = proxyReader
 	}
 
 	return
@@ -125,25 +125,4 @@ func removeClient(clients []*Client, client *Client) []*Client {
 	}
 
 	return clients
-}
-
-func loadProxies() []string {
-	file, err := os.Open("data/proxies.txt")
-	if err != nil {
-		panic(err)
-	}
-
-	defer file.Close()
-
-	var proxies []string
-	decoder := bufio.NewScanner(file)
-	for decoder.Scan() {
-		proxies = append(proxies, decoder.Text())
-	}
-
-	if err != nil {
-		fmt.Println("Error read proxies.txt. Is empty?")
-	}
-
-	return proxies
 }
