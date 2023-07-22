@@ -62,7 +62,7 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(&clients)
 	if err != nil {
-		fmt.Println("Error read users.json. Is empty?")
+		panic(fmt.Errorf("I could not decode the users.json file: %v", err))
 	}
 
 	config, err := websocket.NewConfig("wss://gql-realtime-2.reddit.com/query", "https://hot-potato.reddit.com")
