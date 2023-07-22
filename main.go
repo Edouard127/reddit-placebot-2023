@@ -18,6 +18,7 @@ func main() {
 	browser := NewBrowser(logger.With(zap.String("browser", "test")))
 
 	minX, minY := flag.Int("minX", 0, "Min X"), flag.Int("minY", 0, "Min Y")
+	flag.Parse()
 
 	board := NewBoard(Point{*minX, *minY})
 	worker := NewWorker(board)
