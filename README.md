@@ -21,11 +21,6 @@ After that, you have to put an image in the BMP format in the images folder, nam
 
 Then, you can run the program with `./redditplacebot -minX=64 -minY=64` to start the program, the `minX` and `minY` flags represent the top left of your image in the r/place space.
 
-1. Put the image you would like to draw in the `images` folder in the following format: `image.bmp`
-2. Run the tor expert bundle
-3. Run `go build .` to build the program
-4. Run `./redditplacebot -minX=64 -minY=64` to run the program. The `minX` and `minY` flags are optional and default to 0.
-
 ## How to build
 Download and install Golang 1.20+ from https://golang.org/dl/
 
