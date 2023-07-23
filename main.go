@@ -10,8 +10,11 @@ import (
 	"golang.org/x/net/proxy"
 	"golang.org/x/net/websocket"
 	"net"
+	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"sync"
+	"time"
 )
 
 func main() {
@@ -29,13 +32,31 @@ func main() {
 
 	var login sync.WaitGroup
 
+	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+	if err != nil {
+		panic(err)
+	}
+
+	jar, _ := cookiejar.New(nil)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialer.Dial(network, addr)
+			},
+		},
+		Jar: jar,
+	}
+
 	for _, client := range clients {
 		login.Add(1)
 		go func(c *Client) {
+			c.HTTP = httpClient
 			err := c.Login(board, &login)
 			if err != nil {
 				clients = removeClient(clients, c)
 			}
+
+			go listenForCircuit(time.Second*10, httpClient)
 		}(client)
 	}
 

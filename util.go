@@ -76,7 +76,7 @@ func listenForCircuit(interval time.Duration, current *http.Client) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	
+
 	resp, err := current.Do(req)
 	if err != nil {
 		fmt.Println(err)
