@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/sergeymakinen/go-bmp"
 	"os"
 )
@@ -64,6 +65,9 @@ func pointAbsolute(point, size int) int {
 func LoadBMP(offsetX, offsetY int) *BMPImage {
 	f, err := os.Open("images/image.bmp")
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			panic("Please add an image to the images/image.bmp file")
+		}
 		panic(err)
 	}
 

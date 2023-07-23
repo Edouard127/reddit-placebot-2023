@@ -3,6 +3,7 @@ package main
 import (
 	context "context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"go.uber.org/zap"
@@ -54,6 +55,10 @@ func main() {
 func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 	file, err := os.Open("data/users.json")
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			os.Create("data/users.json")
+			panic("Please add users to the users.json file")
+		}
 		panic(err)
 	}
 
