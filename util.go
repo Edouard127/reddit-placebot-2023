@@ -72,7 +72,11 @@ type Pair[T any, U any] struct {
 func listenForCircuit(interval time.Duration, current *http.Client) {
 	dialer, _ := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
 
-	req, _ := http.NewRequest("GET", "https://api.ipify.org?format=json", nil)
+	req, err := http.NewRequest("GET", "https://api.ipify.org?format=json", nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	
 	resp, err := current.Do(req)
 	if err != nil {
 		fmt.Println(err)
