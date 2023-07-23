@@ -11,6 +11,9 @@
 
 ## How to use
 You need to download the Tor expert bundle from https://www.torproject.org/download/tor/
+
+FOR WINDOWS USERS: You need to add the tor.exe to your PATH, you can do that by following this tutorial: https://www.architectryan.com/2018/03/17/add-to-the-path-on-windows-10/
+
 If you wish to build, the project, click [here to get the build tutorial](#how-to-build)
 
 Then you need to either [build the project](#how-to-build), or download the latest build from the actions tab, click on the first action and go to the artifacts.
