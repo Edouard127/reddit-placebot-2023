@@ -10,10 +10,28 @@
 - A connection to the internet
 
 ## How to use
+You need to download the Tor expert bundle from https://www.torproject.org/download/tor/
+If you wish to build, the project, click [here to get the build tutorial](#how-to-build)
+
+Then you need to either [build the project](#how-to-build), or download the latest build from the actions tab, click on the first action and go to the artifacts.
+
+Once you have to program, you must add users in the file data/users.json.rename and then rename it to data/users.json
+
+After that, you have to put an image in the BMP format in the images folder, named image.bmp
+
+Then, you can run the program with `./redditplacebot -minX=64 -minY=64` to start the program, the `minX` and `minY` flags represent the top left of your image in the r/place space.
+
 1. Put the image you would like to draw in the `images` folder in the following format: `image.bmp`
 2. Run the tor expert bundle
 3. Run `go build .` to build the program
 4. Run `./redditplacebot -minX=64 -minY=64` to run the program. The `minX` and `minY` flags are optional and default to 0.
+
+## How to build
+Download and install Golang 1.20+ from https://golang.org/dl/
+
+Open a terminal and run `go build .`
+
+As simple as that
 
 ## How does it work
 When you put a new user, it will log in using a headless browser by allocating a browser access to that specific client because rod doesn't support multithreaded browser, and then navigate to the r/place reddit.
