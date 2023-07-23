@@ -29,3 +29,14 @@ The worker system is pretty straightforward, when a new user joins, it will be a
 At every second, there is a ticker that will invoke a queue checking, it will try to use all the clients to place a pixel.
 
 Each client has an assigned pair of point to color, which represents the pixel that must be exchanged for the right one, of your image.
+
+## How to avoid getting banned
+Use a rotating tor configuration
+
+Put this in a file named `torrc` on Windows at %APPDATA%\tor\
+```
+CircuitBuildTimeout 30
+LearnCircuitBuildTimeout 0 
+MaxCircuitDirtiness 30
+```
+This will assure a new circuit every 30 seconds

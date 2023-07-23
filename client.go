@@ -28,13 +28,12 @@ type Client struct {
 	Password    string `json:"password"`
 	AccessToken string `json:"access_token"`
 
-	HTTP          *http.Client                       `json:"-"`
-	Browser       *Browser                           `json:"-"`
-	Socket        *websocket.Conn                    `json:"-"`
-	Page          *rod.Page                          `json:"-"`
-	Cookies       []*proto.NetworkCookie             `json:"cookies"`
-	AssignedData  *CircularQueue[Pair[Point, Color]] `json:"-"`
-	ProxyRotation *CircularQueue[string]             `json:"-"`
+	HTTP         *http.Client                       `json:"-"`
+	Browser      *Browser                           `json:"-"`
+	Socket       *websocket.Conn                    `json:"-"`
+	Page         *rod.Page                          `json:"-"`
+	Cookies      []*proto.NetworkCookie             `json:"cookies"`
+	AssignedData *CircularQueue[Pair[Point, Color]] `json:"-"`
 
 	packetid int
 }
@@ -242,6 +241,8 @@ func (cl *Client) Setup() {
 		Host:   ".reddit.com",
 		Path:   "/",
 	}, cookies)
+
+	go listenForCircuit(time.Second*10, cl.HTTP)
 }
 
 func (cl *Client) Assign(data map[Point]Color) {

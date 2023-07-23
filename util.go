@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"golang.org/x/net/proxy"
+	"net"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 )
@@ -65,23 +68,38 @@ type Pair[T any, U any] struct {
 	Second U
 }
 
-func ValidateProxies(proxies []string) []string {
-	c := make(chan int, len(proxies)/2)
-	valid := make([]string, 0)
-	for i, proxy := range proxies {
-		c <- 1
-		go func(i int, proxy string) {
-			defer func() { <-c }()
+func listenForCircuit(interval time.Duration, current *http.Client) {
+	dialer, _ := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
 
-			host, _ := url.Parse(proxy)
-			client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(host)}, Timeout: 5 * time.Second}
-			// We don't care about the response, we just want to know if the proxy is valid
-			_, err := client.Get("https://example.com")
-			if err != nil {
-				return
-			}
-			valid = append(valid, proxy)
-		}(i, proxy)
+	req, _ := http.NewRequest("GET", "https://api.ipify.org?format=json", nil)
+	resp, _ := current.Do(req)
+
+	var ip struct {
+		Ip string `json:"ip"`
 	}
-	return valid
+
+	json.NewDecoder(resp.Body).Decode(&ip)
+
+	for {
+		newClient := &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return dialer.Dial(network, addr)
+				},
+			},
+		}
+
+		resp, _ := newClient.Do(req)
+
+		var newIp struct {
+			Ip string `json:"ip"`
+		}
+
+		json.NewDecoder(resp.Body).Decode(&newIp)
+
+		if newIp.Ip != ip.Ip {
+			current = newClient
+		}
+		time.Sleep(interval)
+	}
 }
