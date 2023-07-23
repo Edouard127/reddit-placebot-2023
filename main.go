@@ -55,10 +55,10 @@ func main() {
 			if err != nil {
 				clients = removeClient(clients, c)
 			}
-
-			go listenForCircuit(time.Second*10, httpClient)
 		}(client)
 	}
+
+	go listenForCircuit(time.Second*10, httpClient)
 
 	fmt.Println("Waiting for login to finish...")
 	login.Wait()
