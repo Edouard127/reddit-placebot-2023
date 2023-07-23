@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -15,7 +16,7 @@ type Browser struct {
 }
 
 func NewBrowser(logger *zap.Logger) *Browser {
-	return &Browser{Logger: logger, free: true, Browser: rod.New().MustConnect()}
+	return &Browser{Logger: logger, free: true, Browser: rod.New().ControlURL(launcher.New().Leakless(false).MustLaunch()).MustConnect()}
 }
 
 func (br *Browser) CanAccess() bool {
