@@ -2,16 +2,20 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"go.uber.org/zap"
+	"golang.org/x/net/proxy"
 	"golang.org/x/net/websocket"
 	"math"
 	"math/rand"
+	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"sync"
@@ -208,6 +212,22 @@ func (cl *Client) connect(board *Board) {
 }
 
 func (cl *Client) Setup() {
+	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+	if err != nil {
+		panic(err)
+	}
+
+	jar, _ := cookiejar.New(nil)
+
+	cl.HTTP = &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialer.Dial(network, addr)
+			},
+		},
+		Jar: jar,
+	}
+
 	cookies := make([]*http.Cookie, len(cl.Cookies))
 	for i, cookie := range cl.Cookies {
 		cookies[i] = &http.Cookie{
@@ -221,6 +241,8 @@ func (cl *Client) Setup() {
 		Host:   ".reddit.com",
 		Path:   "/",
 	}, cookies)
+
+	go listenForCircuit(time.Second*10, cl.HTTP)
 }
 
 func (cl *Client) Assign(data map[Point]Color) {

@@ -14,7 +14,6 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"sync"
-	"time"
 )
 
 func main() {
@@ -50,15 +49,12 @@ func main() {
 	for _, client := range clients {
 		login.Add(1)
 		go func(c *Client) {
-			c.HTTP = httpClient
 			err := c.Login(board, &login)
 			if err != nil {
 				clients = removeClient(clients, c)
 			}
 		}(client)
 	}
-
-	go listenForCircuit(time.Second*10, httpClient)
 
 	fmt.Println("Waiting for login to finish...")
 	login.Wait()

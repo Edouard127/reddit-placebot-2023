@@ -72,7 +72,7 @@ type Pair[T any, U any] struct {
 func listenForCircuit(interval time.Duration, current *http.Client) {
 	dialer, _ := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
 
-	req, err := http.NewRequest("GET", "https://api.ipify.org?format=json", nil)
+	req, err := http.NewRequest("GET", "https://api.seeip.org/jsonip", nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -97,7 +97,7 @@ func listenForCircuit(interval time.Duration, current *http.Client) {
 			},
 		}
 
-		resp, err := newClient.Do(req)
+		resp, err = newClient.Do(req)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -106,7 +106,10 @@ func listenForCircuit(interval time.Duration, current *http.Client) {
 			Ip string `json:"ip"`
 		}
 
-		json.NewDecoder(resp.Body).Decode(&newIp)
+		err = json.NewDecoder(resp.Body).Decode(&newIp)
+		if err != nil {
+			fmt.Println(err)
+		}
 
 		if newIp.Ip != ip.Ip {
 			current = newClient
