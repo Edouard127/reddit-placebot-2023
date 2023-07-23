@@ -5,14 +5,14 @@
 - [x] 👍 Place pixels
 
 ## Requirements
-- Go 1.20+
-- The tor expert bundle (https://www.torproject.org/download/tor/)
+- Go 1.20+ (https://go.dev/dl/)
+- The Tor Expert Bundle (https://www.torproject.org/download/tor/)
 - A connection to the internet
 
 ## How to use
-You need to download the Tor expert bundle from https://www.torproject.org/download/tor/
+You need to download the Tor Expert Bundle from https://www.torproject.org/download/tor/
 
-FOR WINDOWS USERS: You need to add the tor.exe to your PATH, you can do that by following this tutorial: https://www.architectryan.com/2018/03/17/add-to-the-path-on-windows-10/
+FOR WINDOWS USERS: You need to add the tor.exe inside the tor folder to your PATH, you can do that by following this tutorial: https://www.architectryan.com/2018/03/17/add-to-the-path-on-windows-10/
 
 If you wish to build, the project, click [here to get the build tutorial](#how-to-build)
 
@@ -22,12 +22,14 @@ Once you have to program, you must add users in the file data/users.json.rename 
 
 After that, you have to put an image in the BMP format in the images folder, named image.bmp
 
-Then, you can run the program with `./redditplacebot -minX=64 -minY=64` to start the program, the `minX` and `minY` flags represent the top left of your image in the r/place space.
+Then, you can run the program with `./redditplacebot.exe -minX=64 -minY=64` to start the program, the `minX` and `minY` flags represent the top left of your image in the r/place canvas.
 
 ## How to build
 Download and install Golang 1.20+ from https://golang.org/dl/
 
-Open a terminal and run `go build .`
+Open a terminal and run `go build .` inside the scripts folder
+
+A .exe file called `redditplacebot` will appear after the process (go build .) ends
 
 As simple as that
 
@@ -47,7 +49,7 @@ At every second, there is a ticker that will invoke a queue checking, it will tr
 Each client has an assigned pair of point to color, which represents the pixel that must be exchanged for the right one, of your image.
 
 ## How to avoid getting banned
-Use a rotating tor configuration
+Use a rotating Tor configuration
 
 Put this in a file named `torrc` on Windows at %APPDATA%\tor\
 ```
