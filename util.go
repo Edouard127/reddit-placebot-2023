@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"golang.org/x/net/proxy"
 	"net"
 	"net/http"
@@ -89,7 +90,10 @@ func listenForCircuit(interval time.Duration, current *http.Client) {
 			},
 		}
 
-		resp, _ := newClient.Do(req)
+		resp, err := newClient.Do(req)
+		if err != nil {
+			fmt.Println(err)
+		}
 
 		var newIp struct {
 			Ip string `json:"ip"`
