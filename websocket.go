@@ -7,7 +7,7 @@ type Payload[T any] struct {
 }
 
 type Authorization struct {
-	Authorization string `json:"Authorization"`
+	Authorization string `json:"authorization"`
 }
 
 type Var[Chan any] struct {
@@ -85,9 +85,9 @@ type CanvasUpdateData struct {
 }
 
 type CanvasInfo struct {
-	CurrentTimestamp  int64  `json:"currentTimestamp"`
-	Name              string `json:"name"`
-	PreviousTimestamp int64  `json:"previousTimestamp"`
+	CurrentTimestamp  float64 `json:"currentTimestamp"`
+	Name              string  `json:"name"`
+	PreviousTimestamp float64 `json:"previousTimestamp"`
 }
 
 type PlacePixel struct {

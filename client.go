@@ -10,16 +10,18 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"go.uber.org/zap"
 	"golang.org/x/net/proxy"
-	"golang.org/x/net/websocket"
 	"math"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"nhooyr.io/websocket/wsjson"
 	"os"
 	"sync"
 	"time"
+
+	websocket "nhooyr.io/websocket"
 )
 
 type Client struct {
@@ -30,6 +32,7 @@ type Client struct {
 
 	HTTP         *http.Client                       `json:"-"`
 	Browser      *Browser                           `json:"-"`
+	WSconfig     *websocket.DialOptions             `json:"-"`
 	Socket       *websocket.Conn                    `json:"-"`
 	Page         *rod.Page                          `json:"-"`
 	Cookies      []*proto.NetworkCookie             `json:"cookies"`
@@ -99,17 +102,23 @@ func (cl *Client) getAccessToken() {
 
 func (cl *Client) connect(board *Board) {
 	var err error
+	cl.Socket, _, err = websocket.Dial(context.Background(), "wss://gql-realtime-2.reddit.com/query", cl.WSconfig)
+	if err != nil {
+		cl.Error("Failed to connect to websocket", zap.Error(err))
+		return
+	}
+	defer cl.Socket.Close(websocket.StatusNormalClosure, "user closed connection")
 
-	login, _ := json.Marshal(ConnectionInit{
+	login := ConnectionInit{
 		Type: "connection_init",
 		Payload: Authorization{
 			Authorization: cl.AccessToken,
 		},
-	})
+	}
 
 	cl.packetid++
 
-	subscribe, _ := json.Marshal(Subscribe{
+	subscribe := Subscribe{
 		Id:   fmt.Sprintf("%d", cl.packetid),
 		Type: "start",
 		Payload: Var[VarInput[Input[SubscribeConfig]]]{
@@ -124,11 +133,11 @@ func (cl *Client) connect(board *Board) {
 			OperationName: "configuration",
 			Query:         "subscription configuration($input: SubscribeInput!) {\n  subscribe(input: $input) {\n    id\n    ... on BasicMessage {\n      data {\n        __typename\n        ... on ConfigurationMessageData {\n          colorPalette {\n            colors {\n              hex\n              index\n              __typename\n            }\n            __typename\n          }\n          canvasConfigurations {\n            index\n            dx\n            dy\n            __typename\n          }\n          activeZone {\n            topLeft {\n              x\n              y\n              __typename\n            }\n            bottomRight {\n              x\n              y\n              __typename\n            }\n            __typename\n          }\n          canvasWidth\n          canvasHeight\n          adminConfiguration {\n            maxAllowedCircles\n            maxUsersPerAdminBan\n            __typename\n          }\n          __typename\n        }\n      }\n      __typename\n    }\n    __typename\n  }\n}\n",
 		},
-	})
+	}
 
-	getCanvas := func(tag string) []byte {
+	getCanvas := func(tag string) Replace {
 		cl.packetid++
-		data, _ := json.Marshal(Replace{
+		return Replace{
 			Id:   fmt.Sprintf("%d", cl.packetid),
 			Type: "start",
 			Payload: Var[VarInput[Input[SubscribeReplace]]]{
@@ -144,22 +153,18 @@ func (cl *Client) connect(board *Board) {
 				OperationName: "replace",
 				Query:         "subscription replace($input: SubscribeInput!) {\n  subscribe(input: $input) {\n    id\n    ... on BasicMessage {\n      data {\n        __typename\n        ... on FullFrameMessageData {\n          __typename\n          name\n          timestamp\n        }\n        ... on DiffFrameMessageData {\n          __typename\n          name\n          currentTimestamp\n          previousTimestamp\n        }\n      }\n      __typename\n    }\n    __typename\n  }\n}\n",
 			},
-		})
-		return data
+		}
 	}
 
-	cl.Socket.Write(login)
+	err = wsjson.Write(context.Background(), cl.Socket, login)
 
 	var errorPayload ConnectionUnauthorized
 	for {
-		var message string
-		err = websocket.Message.Receive(cl.Socket, &message)
+		err = wsjson.Read(context.Background(), cl.Socket, &errorPayload)
 		if err != nil {
 			fmt.Println("Error receiving message from socket", err)
 			return
 		}
-
-		json.Unmarshal([]byte(message), &errorPayload)
 
 		if errorPayload.Type != "connection_error" {
 			break
@@ -168,18 +173,15 @@ func (cl *Client) connect(board *Board) {
 		}
 	}
 
-	cl.Socket.Write(subscribe)
+	err = wsjson.Write(context.Background(), cl.Socket, subscribe)
 
 	var data SubscribedData
 	for {
-		var message string
-		err = websocket.Message.Receive(cl.Socket, &message)
+		err = wsjson.Read(context.Background(), cl.Socket, &data)
 		if err != nil {
 			fmt.Println("Error receiving message from socket", err)
 			return
 		}
-
-		json.Unmarshal([]byte(message), &data)
 
 		if data.Type == "data" {
 			break
@@ -190,22 +192,20 @@ func (cl *Client) connect(board *Board) {
 	board.SetColors(cl, data.Payload.Data.Subscribe.Data.ColorPalette.Colors)
 	board.SetRequiredData(cl, ImageColorConvert(LoadBMP(board.Start.X, board.Start.Y)))
 
-	cl.Socket.Write(getCanvas("1"))
-	cl.Socket.Write(getCanvas("2"))
-	cl.Socket.Write(getCanvas("3"))
-	cl.Socket.Write(getCanvas("4"))
-	cl.Socket.Write(getCanvas("5"))
+	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("0"))
+	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("1"))
+	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("2"))
+	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("3"))
+	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("4"))
+	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("5"))
 
 	var canvasData CanvasUpdate
 	for {
-		var message string
-		err = websocket.Message.Receive(cl.Socket, &message)
+		err = wsjson.Read(context.Background(), cl.Socket, &canvasData)
 		if err != nil {
 			fmt.Println("Error receiving message from socket", err)
 			return
 		}
-
-		json.Unmarshal([]byte(message), &canvasData)
 
 		board.SetCurrentData(cl, canvasData.Payload.Data.Subscribe.Data.Name)
 	}
