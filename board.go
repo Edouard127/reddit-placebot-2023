@@ -66,19 +66,17 @@ func (b *Board) SetColors(c *Client, colors []SubscribeColor) {
 	}
 
 	SetActiveColors(colors)
+	b.loadImage(c)
 }
 
-// SetRequiredData should be called after we're connected to the websocket and received the SubscribedData
-func (b *Board) SetRequiredData(c *Client, data *BMPImage) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
+// loadImage should be called after we're connected to the websocket and received the SubscribedData
+func (b *Board) loadImage(c *Client) {
 	if !b.checkForController(c) {
 		return
 	}
 
-	b.End = Point{X: data.Width, Y: data.Height}
-	b.RequiredData = data
+	b.RequiredData = ImageColorConvert(LoadBMP(b.Start.X, b.Start.Y))
+	b.End = Point{X: b.RequiredData.Width, Y: b.RequiredData.Height}
 }
 
 func (b *Board) SetCurrentData(c *Client, url string) {

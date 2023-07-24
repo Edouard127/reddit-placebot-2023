@@ -190,7 +190,6 @@ func (cl *Client) connect(board *Board) {
 
 	board.SetController(cl) // Do not remove
 	board.SetColors(cl, data.Payload.Data.Subscribe.Data.ColorPalette.Colors)
-	board.SetRequiredData(cl, ImageColorConvert(LoadBMP(board.Start.X, board.Start.Y)))
 
 	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("0"))
 	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("1"))
