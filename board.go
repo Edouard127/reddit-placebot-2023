@@ -146,16 +146,16 @@ func ImageColorConvert(image *BMPImage) *BMPImage {
 }
 
 func closestColor(color Color) *Color {
-	var closestColor *Color
+	var closestColor Color
 	var closestDistance = math.MaxFloat64
 	for _, c := range ActiveColors {
 		distance := euclideanDistance(color, c)
-		if closestDistance == 0 || distance < closestDistance {
+		if distance < closestDistance {
 			closestDistance = distance
-			closestColor = &c
+			closestColor = c
 		}
 	}
-	return closestColor
+	return &closestColor
 }
 
 func hexToRGB(hexColor string) Color {
