@@ -7,7 +7,7 @@ type Payload[T any] struct {
 }
 
 type Authorization struct {
-	Authorization string `json:"authorization"`
+	Authorization string `json:"Authorization"`
 }
 
 type Var[Chan any] struct {

@@ -43,10 +43,6 @@ func main() {
 
 	writeClients(clients...)
 
-	fmt.Println("Waiting for board data")
-	board.WaitForData()
-	fmt.Println("Board data received!")
-
 	worker.ClientJoin(clients...)
 	worker.Run()
 }
@@ -81,7 +77,7 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 	config.HTTPHeader.Add("Sec-WebSocket-Key", "ito9k+J7oZkTKA3y7IS/Zw==")
 	config.HTTPHeader.Add("Sec-WebSocket-Version", "13")
 	config.HTTPHeader.Add("Upgrade", "websocket")
-	config.HTTPHeader.Add("Origin", "https://hot-potato.reddit.com")
+	config.HTTPHeader.Add("Origin", "https://garlic-bread.reddit.com")
 	config.HTTPHeader.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 OPR/100.0.0.0 (Edition std-2)")
 
 	if len(clients) == 0 {
