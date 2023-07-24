@@ -23,6 +23,15 @@ type Point struct {
 	Y int `json:"y"`
 }
 
+var CanvasConfiguration = map[int][]int{
+	0: {0, 0},
+	1: {1000, 0},
+	2:  {2000, 0},
+	3:  {0, 1000},
+	4:  {1000, 1000},
+	5:  {2000, 1000},
+}
+
 func (p Point) toPlacePoint(canvas int) Point {
 	// canvas 0 -> x+1500 y+1000
 	// canvas 1 -> x+500 y+1000
@@ -30,29 +39,10 @@ func (p Point) toPlacePoint(canvas int) Point {
 	// canvas 3 -> x+1500 y+0
 	// canvas 4 -> x+500 y+0
 	// canvas 5 -> x-500 y+0
-	var x, y int
-	switch canvas {
-	case 0:
-		x = p.X + 1500
-		y = p.Y + 1000
-	case 1:
-		x = p.X + 500
-		y = p.Y + 1000
-	case 2:
-		x = p.X + 1500
-		y = p.Y
-	case 3:
-		x = p.X + 1500
-		y = p.Y
-	case 4:
-		x = p.X + 500
-		y = p.Y
-	case 5:
-		x = p.X - 500
-		y = p.Y
+	return Point{
+		X: p.X + 1500 - CanvasConfiguration[canvas][0],
+		Y: p.Y + 1000 - CanvasConfiguration[canvas][1],
 	}
-
-	return Point{x, y}
 }
 
 func pointAbsolute(point, size int) int {
