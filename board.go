@@ -5,9 +5,11 @@ import (
 	"image/png"
 	"math"
 	"net/http"
+	"sync"
 )
 
 type Board struct {
+	mu           sync.Mutex
 	Start, End   Point
 	RequiredData *BMPImage // The image to draw on the canvas
 	CurrentData  *BMPImage // Only the canvas data between Start and End, so we don't flood the memory and the cpu
@@ -33,6 +35,9 @@ func (b *Board) GetCanvasIndex(at Point) int {
 }
 
 func (b *Board) GetDifferentData() map[Point]Color {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	differentData := make(map[Point]Color, 0)
 
 	for point, color := range b.RequiredData.Colors {
@@ -65,6 +70,9 @@ func (b *Board) SetColors(c *Client, colors []SubscribeColor) {
 
 // SetRequiredData should be called after we're connected to the websocket and received the SubscribedData
 func (b *Board) SetRequiredData(c *Client, data *BMPImage) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if !b.checkForController(c) {
 		return
 	}
@@ -74,16 +82,14 @@ func (b *Board) SetRequiredData(c *Client, data *BMPImage) {
 }
 
 func (b *Board) SetCurrentData(c *Client, url string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if !b.checkForController(c) {
 		return
 	}
 
 	b.downloadImage(url)
-}
-
-func (b *Board) WaitForData() {
-	for b.RequiredData == nil || b.CurrentData == nil {
-	}
 }
 
 var Colors = map[int]Color{
