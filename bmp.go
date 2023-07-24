@@ -23,33 +23,20 @@ type Point struct {
 	Y int `json:"y"`
 }
 
-var CanvasConfiguration = map[int][]int{
+var canvasConfiguration = map[int]Pair[int, int]{
 	0: {0, 0},
 	1: {1000, 0},
-	2:  {2000, 0},
-	3:  {0, 1000},
-	4:  {1000, 1000},
-	5:  {2000, 1000},
+	2: {2000, 0},
+	3: {0, 1000},
+	4: {1000, 1000},
+	5: {2000, 1000},
 }
 
 func (p Point) toPlacePoint(canvas int) Point {
-	// canvas 0 -> x+1500 y+1000
-	// canvas 1 -> x+500 y+1000
-	// canvas 2 -> x+1500 y+0
-	// canvas 3 -> x+1500 y+0
-	// canvas 4 -> x+500 y+0
-	// canvas 5 -> x-500 y+0
 	return Point{
-		X: p.X + 1500 - CanvasConfiguration[canvas][0],
-		Y: p.Y + 1000 - CanvasConfiguration[canvas][1],
+		X: p.X + 1500 - canvasConfiguration[canvas].First,
+		Y: p.Y + 1000 - canvasConfiguration[canvas].Second,
 	}
-}
-
-func pointAbsolute(point, size int) int {
-	if point < 0 {
-		return size + point
-	}
-	return point
 }
 
 func LoadBMP(offsetX, offsetY int) *BMPImage {
