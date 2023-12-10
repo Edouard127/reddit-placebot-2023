@@ -1,4 +1,6 @@
-package main
+package web
+
+import "github.com/Edouard127/redditplacebot/board"
 
 type Payload[T any] struct {
 	Id      string `json:"id,omitempty"`
@@ -76,8 +78,8 @@ type CanvasConfigurations struct {
 }
 
 type ActiveZone struct {
-	TopLeft     Point `json:"topLeft"`
-	BottomRight Point `json:"bottomRight"`
+	TopLeft     board.Point `json:"topLeft"`
+	BottomRight board.Point `json:"bottomRight"`
 }
 
 type CanvasUpdateData struct {
@@ -100,9 +102,9 @@ type PlaceInput[PlaceType any] struct {
 }
 
 type PlaceData struct {
-	CanvasIndex int   `json:"canvasIndex"`
-	ColorIndex  int   `json:"colorIndex"`
-	Coordinate  Point `json:"coordinate"`
+	CanvasIndex int         `json:"canvasIndex"`
+	ColorIndex  int         `json:"colorIndex"`
+	Coordinate  board.Point `json:"coordinate"`
 }
 
 type Error struct {

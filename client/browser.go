@@ -1,22 +1,20 @@
-package main
+package client
 
 import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
-	"go.uber.org/zap"
 	"sync"
 )
 
 type Browser struct {
-	*zap.Logger
 	mu     sync.Mutex
 	free   bool // We use a free variable to determine if the client can have access to the browser since rod doesn't support multithreading
 	caller *Client
 	*rod.Browser
 }
 
-func NewBrowser(logger *zap.Logger) *Browser {
-	return &Browser{Logger: logger, free: true, Browser: rod.New().ControlURL(launcher.New().Leakless(false).MustLaunch()).MustConnect()}
+func NewBrowser() *Browser {
+	return &Browser{free: true, Browser: rod.New().ControlURL(launcher.New().Leakless(false).MustLaunch()).MustConnect()}
 }
 
 func (br *Browser) CanAccess() bool {
