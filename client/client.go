@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"bytes"
@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Edouard127/redditplacebot/board"
+	"github.com/Edouard127/redditplacebot/util"
+	"github.com/Edouard127/redditplacebot/web"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"go.uber.org/zap"
@@ -21,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	websocket "nhooyr.io/websocket"
+	"nhooyr.io/websocket"
 )
 
 type Client struct {
@@ -30,23 +33,23 @@ type Client struct {
 	Password    string `json:"password"`
 	AccessToken string `json:"access_token"`
 
-	HTTP         *http.Client                       `json:"-"`
-	Browser      *Browser                           `json:"-"`
-	WSconfig     *websocket.DialOptions             `json:"-"`
-	Socket       *websocket.Conn                    `json:"-"`
-	Page         *rod.Page                          `json:"-"`
-	Cookies      []*proto.NetworkCookie             `json:"cookies"`
-	AssignedData *CircularQueue[Pair[Point, Color]] `json:"-"`
+	HTTP         *http.Client                                             `json:"-"`
+	Browser      *Browser                                                 `json:"-"`
+	WSconfig     *websocket.DialOptions                                   `json:"-"`
+	Socket       *websocket.Conn                                          `json:"-"`
+	Page         *rod.Page                                                `json:"-"`
+	Cookies      []*proto.NetworkCookie                                   `json:"cookies"`
+	AssignedData *util.CircularQueue[util.Pair[board.Point, board.Color]] `json:"-"`
 
 	packetid int
 }
 
-func (cl *Client) Login(board *Board, wg *sync.WaitGroup) error {
+func (cl *Client) Login(wg *sync.WaitGroup) error {
 	defer wg.Done()
 	defer cl.Setup()
 
 	if cl.AccessToken != "" {
-		go cl.connect(board)
+		go cl.connect()
 		cl.Info("Login successful")
 		return nil
 	}
@@ -86,7 +89,7 @@ func (cl *Client) Login(board *Board, wg *sync.WaitGroup) error {
 }
 
 func (cl *Client) getAccessToken() {
-	var connInit ConnectionInit
+	var connInit web.ConnectionInit
 
 	cl.Page = cl.Browser.MustPage("https://www.reddit.com/r/place/")
 
@@ -100,7 +103,7 @@ func (cl *Client) getAccessToken() {
 	cl.AccessToken = connInit.Payload.Authorization
 }
 
-func (cl *Client) connect(board *Board) {
+func (cl *Client) connect() {
 	var err error
 	cl.Socket, _, err = websocket.Dial(context.Background(), "wss://gql-realtime-2.reddit.com/query", cl.WSconfig)
 	if err != nil {
@@ -109,22 +112,22 @@ func (cl *Client) connect(board *Board) {
 	}
 	defer cl.Socket.Close(websocket.StatusNormalClosure, "user closed connection")
 
-	login := ConnectionInit{
+	login := web.ConnectionInit{
 		Type: "connection_init",
-		Payload: Authorization{
+		Payload: web.Authorization{
 			Authorization: cl.AccessToken,
 		},
 	}
 
 	cl.packetid++
 
-	subscribe := Subscribe{
+	subscribe := web.Subscribe{
 		Id:   fmt.Sprintf("%d", cl.packetid),
 		Type: "start",
-		Payload: Var[VarInput[Input[SubscribeConfig]]]{
-			Variables: VarInput[Input[SubscribeConfig]]{
-				Input: Input[SubscribeConfig]{
-					Channel: SubscribeConfig{
+		Payload: web.Var[web.VarInput[web.Input[web.SubscribeConfig]]]{
+			Variables: web.VarInput[web.Input[web.SubscribeConfig]]{
+				Input: web.Input[web.SubscribeConfig]{
+					Channel: web.SubscribeConfig{
 						TeamOwner: "GARLICBREAD",
 						Category:  "CONFIG",
 					},
@@ -135,15 +138,15 @@ func (cl *Client) connect(board *Board) {
 		},
 	}
 
-	getCanvas := func(tag string) Replace {
+	getCanvas := func(tag string) web.Replace {
 		cl.packetid++
-		return Replace{
+		return web.Replace{
 			Id:   fmt.Sprintf("%d", cl.packetid),
 			Type: "start",
-			Payload: Var[VarInput[Input[SubscribeReplace]]]{
-				Variables: VarInput[Input[SubscribeReplace]]{
-					Input: Input[SubscribeReplace]{
-						Channel: SubscribeReplace{
+			Payload: web.Var[web.VarInput[web.Input[web.SubscribeReplace]]]{
+				Variables: web.VarInput[web.Input[web.SubscribeReplace]]{
+					Input: web.Input[web.SubscribeReplace]{
+						Channel: web.SubscribeReplace{
 							TeamOwner: "GARLICBREAD",
 							Category:  "CANVAS",
 							Tag:       tag,
@@ -158,7 +161,7 @@ func (cl *Client) connect(board *Board) {
 
 	err = wsjson.Write(context.Background(), cl.Socket, login)
 
-	var errorPayload ConnectionUnauthorized
+	var errorPayload web.ConnectionUnauthorized
 	for {
 		err = wsjson.Read(context.Background(), cl.Socket, &errorPayload)
 		if err != nil {
@@ -175,7 +178,7 @@ func (cl *Client) connect(board *Board) {
 
 	err = wsjson.Write(context.Background(), cl.Socket, subscribe)
 
-	var data SubscribedData
+	var data web.SubscribedData
 	for {
 		err = wsjson.Read(context.Background(), cl.Socket, &data)
 		if err != nil {
@@ -198,7 +201,7 @@ func (cl *Client) connect(board *Board) {
 	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("4"))
 	err = wsjson.Write(context.Background(), cl.Socket, getCanvas("5"))
 
-	var canvasData CanvasUpdate
+	var canvasData web.CanvasUpdate
 	for {
 		err = wsjson.Read(context.Background(), cl.Socket, &canvasData)
 		if err != nil {
@@ -241,31 +244,39 @@ func (cl *Client) Setup() {
 		Path:   "/",
 	}, cookies)
 
-	go listenForCircuit(time.Second*10, cl.HTTP)
+	go func() {
+		for {
+			select {
+			case <-time.NewTicker(time.Second * 60).C:
+				cl.Setup()
+			default:
+
+			}
+		}
+	}()
 }
 
-func (cl *Client) Assign(data map[Point]Color) {
+func (cl *Client) Assign(data map[board.Point]board.Color) {
 	for point, color := range data {
-		cl.AssignedData.Enqueue(Pair[Point, Color]{point, color})
+		cl.AssignedData.Enqueue(util.Pair[board.Point, board.Color]{First: point, Second: color})
 	}
 }
 
 // Place places a pixel at the given point, does not require a browser allocation
 // Fix: It doesn't return any errors but doesn't place a pixel either
-func (cl *Client) Place(board *Board) time.Time {
+func (cl *Client) Place(color, canvas int) time.Time {
 	data := cl.AssignedData.Dequeue()
-	fmt.Println("Placing pixel", data.First, data.Second, board.GetCanvasIndex(data.First), data.First.toPlacePoint(board.GetCanvasIndex(data.First)))
 
-	place, _ := json.Marshal(Place{
+	place, _ := json.Marshal(web.Place{
 		OperationName: "setPixel",
 		Query:         "mutation setPixel($input: ActInput!) {\n  act(input: $input) {\n    data {\n      ... on BasicMessage {\n        id\n        data {\n          ... on GetUserCooldownResponseMessageData {\n            nextAvailablePixelTimestamp\n            __typename\n          }\n          ... on SetPixelResponseMessageData {\n            timestamp\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n",
-		Variables: PlacePixel{
-			Input: PlaceInput[PlaceData]{
+		Variables: web.PlacePixel{
+			Input: web.PlaceInput[web.PlaceData]{
 				ActionName: "r/replace:set_pixel",
-				PixelMessageData: PlaceData{
-					CanvasIndex: board.GetCanvasIndex(data.First),
-					ColorIndex:  GetColorIndex(data.Second),
-					Coordinate:  data.First.toPlacePoint(board.GetCanvasIndex(data.First)),
+				PixelMessageData: web.PlaceData{
+					CanvasIndex: canvas,
+					ColorIndex:  color,
+					Coordinate:  data.First.ToPlacePoint(canvas),
 				},
 			},
 		},
@@ -276,7 +287,7 @@ func (cl *Client) Place(board *Board) time.Time {
 		cl.Error("Error creating request", zap.Error(err))
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			cl.Setup()
-			return cl.Place(board)
+			return cl.Place(color, canvas)
 		}
 		return time.Now()
 	}
@@ -294,7 +305,7 @@ func (cl *Client) Place(board *Board) time.Time {
 
 	defer resp.Body.Close()
 
-	var response Error
+	var response web.Error
 
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
@@ -303,7 +314,7 @@ func (cl *Client) Place(board *Board) time.Time {
 	}
 
 	if len(response.Errors) == 0 {
-		if cl.GetPlaceHistory(data.First, board.GetCanvasIndex(data.First)).Data.Act.Data[0].Data.UserInfo.Username != cl.Username {
+		if cl.GetPlaceHistory(data.First, canvas).Data.Act.Data[0].Data.UserInfo.Username != cl.Username {
 			cl.Info("There was an error placing pixel", zap.String("message", "Pixel was not placed, or was placed somewhere else"))
 		}
 		return time.Now().Add(5 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
@@ -326,16 +337,16 @@ func (cl *Client) Place(board *Board) time.Time {
 	}
 }
 
-func (cl *Client) GetPlaceHistory(at Point, canvas int) HistoryResponse {
-	history, _ := json.Marshal(History{
+func (cl *Client) GetPlaceHistory(at board.Point, canvas int) web.HistoryResponse {
+	history, _ := json.Marshal(web.History{
 		OperationName: "pixelHistory",
 		Query:         "mutation pixelHistory($input: ActInput!) {\n  act(input: $input) {\n    data {\n      ... on BasicMessage {\n        id\n        data {\n          ... on GetTileHistoryResponseMessageData {\n            lastModifiedTimestamp\n            userInfo {\n              userID\n              username\n              __typename\n            }\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n",
-		Variables: VarInput[PlaceInput[PlaceData]]{
-			Input: PlaceInput[PlaceData]{
+		Variables: web.VarInput[web.PlaceInput[web.PlaceData]]{
+			Input: web.PlaceInput[web.PlaceData]{
 				ActionName: "r/replace:get_tile_history",
-				PixelMessageData: PlaceData{
+				PixelMessageData: web.PlaceData{
 					CanvasIndex: canvas,
-					Coordinate:  at.toPlacePoint(canvas),
+					Coordinate:  at.ToPlacePoint(canvas),
 				},
 			},
 		},
@@ -358,7 +369,7 @@ func (cl *Client) GetPlaceHistory(at Point, canvas int) HistoryResponse {
 
 	defer resp.Body.Close()
 
-	var response HistoryResponse
+	var response web.HistoryResponse
 
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {

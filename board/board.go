@@ -1,7 +1,9 @@
-package main
+package board
 
 import (
 	"fmt"
+	"github.com/Edouard127/redditplacebot/client"
+	"github.com/Edouard127/redditplacebot/web"
 	"image/png"
 	"math"
 	"net/http"
@@ -11,9 +13,9 @@ import (
 type Board struct {
 	mu           sync.Mutex
 	Start, End   Point
-	RequiredData *BMPImage // The image to draw on the canvas
-	CurrentData  *BMPImage // Only the canvas data between Start and End, so we don't flood the memory and the cpu
-	controller   *Client   // Only one client will control the information to the board, so we don't flood the memory and the cpu
+	RequiredData *BMPImage      // The image to draw on the canvas
+	CurrentData  *BMPImage      // Only the canvas data between Start and End, so we don't flood the memory and the cpu
+	controller   *client.Client // Only one client will control the information to the board, so we don't flood the memory and the cpu
 }
 
 func NewBoard(start Point) *Board {
@@ -49,18 +51,18 @@ func (b *Board) GetDifferentData() map[Point]Color {
 	return differentData
 }
 
-func (b *Board) SetController(controller *Client) {
+func (b *Board) SetController(controller *client.Client) {
 	if b.controller == nil {
 		b.controller = controller
 		b.controller.Logger.Info("Controller changed")
 	}
 }
 
-func (b *Board) checkForController(c *Client) bool {
+func (b *Board) checkForController(c *client.Client) bool {
 	return b.controller == c && b.controller != nil
 }
 
-func (b *Board) SetColors(c *Client, colors []SubscribeColor) {
+func (b *Board) SetColors(c *client.Client, colors []web.SubscribeColor) {
 	if !b.checkForController(c) {
 		return
 	}
@@ -70,22 +72,18 @@ func (b *Board) SetColors(c *Client, colors []SubscribeColor) {
 }
 
 // loadImage should be called after we're connected to the websocket and received the SubscribedData
-func (b *Board) loadImage(c *Client) {
+func (b *Board) loadImage(c *client.Client) {
 	if !b.checkForController(c) {
 		return
 	}
 
-	b.RequiredData = ImageColorConvert(LoadBMP(b.Start.X, b.Start.Y))
+	b.RequiredData = LoadBMP(b.Start.X, b.Start.Y)
 	b.End = Point{X: b.RequiredData.Width, Y: b.RequiredData.Height}
 }
 
-func (b *Board) SetCurrentData(c *Client, url string) {
+func (b *Board) SetCurrentData(url string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
-	if !b.checkForController(c) {
-		return
-	}
 
 	b.downloadImage(url)
 }
@@ -127,7 +125,7 @@ var Colors = map[int]Color{
 
 var ActiveColors = make(map[int]Color, 0)
 
-func SetActiveColors(colors []SubscribeColor) {
+func SetActiveColors(colors []web.SubscribeColor) {
 	for _, color := range colors {
 		ActiveColors[color.Index] = Colors[color.Index]
 	}
@@ -153,7 +151,7 @@ func closestColor(color Color) *Color {
 	var closestColor *Color
 	var closestDistance = math.MaxFloat64
 	for _, c := range ActiveColors {
-		distance := euclideanDistance(color, c)
+		distance := float64((color.R-c.R)*(color.R-c.R) + (color.G-c.G)*(color.G-c.G) + (color.B-c.B)*(color.B-c.B))
 		if closestDistance == 0 || distance < closestDistance {
 			closestDistance = distance
 			closestColor = &c

@@ -58,3 +58,6 @@ LearnCircuitBuildTimeout 0
 MaxCircuitDirtiness 30
 ```
 This will assure a new circuit every 30 seconds
+
+By the way I am not paid for any of this code, the more I'm getting paid, the more I will work on this.
+If you'd like to support you can create an issue and will give you my crypto addresses.

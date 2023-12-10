@@ -5,6 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/Edouard127/redditplacebot/board"
+	"github.com/Edouard127/redditplacebot/client"
+	"github.com/Edouard127/redditplacebot/util"
 	"go.uber.org/zap"
 	"net/http"
 	"nhooyr.io/websocket"
@@ -14,31 +17,30 @@ import (
 
 func main() {
 	logger, _ := zap.NewDevelopment()
-	browser := NewBrowser(logger.With(zap.String("browser", "test")))
+	browser := client.NewBrowser()
 	defer browser.Browser.Close()
 
 	minX, minY := flag.Int("minX", 0, "Min X"), flag.Int("minY", 0, "Min Y")
 	flag.Parse()
 
-	board := NewBoard(Point{*minX, *minY})
-	worker := NewWorker(board)
+	worker := NewWorker(board.NewBoard(board.Point{X: *minX, Y: *minY}))
 
 	clients := readClients(logger, browser)
 
-	var login sync.WaitGroup
+	var wg sync.WaitGroup
 
-	for _, client := range clients {
-		login.Add(1)
-		go func(c *Client) {
-			err := c.Login(board, &login)
+	for _, c := range clients {
+		wg.Add(1)
+		go func(c *client.Client) {
+			err := c.Login(&wg)
 			if err != nil {
 				clients = removeClient(clients, c)
 			}
-		}(client)
+		}(c)
 	}
 
-	fmt.Println("Waiting for login to finish...")
-	login.Wait()
+	fmt.Println("Waiting for wg to finish...")
+	wg.Wait()
 	fmt.Println("Login finished!")
 
 	writeClients(clients...)
@@ -47,7 +49,7 @@ func main() {
 	worker.Run()
 }
 
-func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
+func readClients(logger *zap.Logger, browser *client.Browser) (clients []*client.Client) {
 	file, err := os.Open("data/users.json")
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -88,13 +90,13 @@ func readClients(logger *zap.Logger, browser *Browser) (clients []*Client) {
 		client.Logger = logger.With(zap.String("username", client.Username))
 		client.Browser = browser
 		client.WSconfig = config
-		client.AssignedData = NewCircularQueue[Pair[Point, Color]](0) // dynamic
+		client.AssignedData = util.NewCircularQueue[util.Pair[board2.Point, board2.Color]](0) // dynamic
 	}
 
 	return
 }
 
-func writeClients(clients ...*Client) {
+func writeClients(clients ...*client2.Client) {
 	file, err := os.Create("data/users.json")
 	if err != nil {
 		panic(err)
@@ -111,7 +113,7 @@ func writeClients(clients ...*Client) {
 
 var s sync.Mutex
 
-func removeClient(clients []*Client, client *Client) []*Client {
+func removeClient(clients []*client2.Client, client *client2.Client) []*client2.Client {
 	s.Lock()
 	defer s.Unlock()
 

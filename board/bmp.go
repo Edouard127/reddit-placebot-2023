@@ -1,7 +1,8 @@
-package main
+package board
 
 import (
 	"errors"
+	"github.com/Edouard127/redditplacebot/util"
 	"github.com/sergeymakinen/go-bmp"
 	"os"
 )
@@ -23,7 +24,7 @@ type Point struct {
 	Y int `json:"y"`
 }
 
-var canvasConfiguration = map[int]Pair[int, int]{
+var canvasConfiguration = map[int]util.Pair[int, int]{
 	0: {0, 0},
 	1: {1000, 0},
 	2: {2000, 0},
@@ -32,7 +33,7 @@ var canvasConfiguration = map[int]Pair[int, int]{
 	5: {2000, 1000},
 }
 
-func (p Point) toPlacePoint(canvas int) Point {
+func (p Point) ToPlacePoint(canvas int) Point {
 	return Point{
 		X: p.X + 1500 - canvasConfiguration[canvas].First,
 		Y: p.Y + 1000 - canvasConfiguration[canvas].Second,
@@ -40,10 +41,10 @@ func (p Point) toPlacePoint(canvas int) Point {
 }
 
 func LoadBMP(offsetX, offsetY int) *BMPImage {
-	f, err := os.Open("images/image.bmp")
+	f, err := os.Open("../data/image.bmp")
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			panic("Please add an image to the images/image.bmp file")
+			panic("Please add an image in the data folder")
 		}
 		panic(err)
 	}
@@ -62,11 +63,11 @@ func LoadBMP(offsetX, offsetY int) *BMPImage {
 	for x := 0; x < image.Bounds().Dx(); x++ {
 		for y := 0; y < image.Bounds().Dy(); y++ {
 			r, g, b, _ := image.At(x, y).RGBA()
-			bmpImage.Colors[Point{x + offsetX, y + offsetY}] = Color{
+			bmpImage.Colors[Point{x + offsetX, y + offsetY}] = *closestColor(Color{
 				R: uint8(r),
 				G: uint8(g),
 				B: uint8(b),
-			}
+			})
 		}
 	}
 
